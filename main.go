@@ -1,53 +1,86 @@
 package main
 
 import (
-	"encoding/json"
+	"errors"
 	"fmt"
 	"log"
+	"os"
 
 	"github.com/alpacahq/alpaca-trade-api-go/v2/alpaca"
+	"github.com/aws/aws-lambda-go/events"
+	"github.com/aws/aws-lambda-go/lambda"
 )
 
-type Secret struct {
-	SecretKey string
+type configuration struct {
+	apiKey    string
+	apiSecret string
 }
 
-func main() {
-	var secret map[string]string
-	var apiK string
-	var apiS string
+type handler struct {
+	config configuration
+	client alpaca.Client
+}
 
-	log.Print("Retreiving secrets...")
-	apiKey, err := getSecret()
-	if err != nil {
-		log.Fatalf("Failed to get secrets %v", err)
+func newConfig() (configuration, error) {
+	log.Println("Executing newConfig()")
+	key, ok := os.LookupEnv("ALPACA_API_KEY")
+	if !ok {
+		return configuration{}, errors.New("can not read env variable")
 	}
 
-	// unmarshal api key json into secret var
-	err = json.Unmarshal([]byte(apiKey), &secret)
-
-	if err != nil {
-		log.Fatalf("could not unmarshal json: %v\n", err)
+	secret, ok := os.LookupEnv(("ALPACA_API_SECRET"))
+	if !ok {
+		return configuration{}, errors.New("can not read env variable")
 	}
 
-	// get key and secret
-	for k, v := range secret {
-		apiK = k
-		apiS = v
-	}
+	return configuration{
+		apiKey:    key,
+		apiSecret: secret,
+	}, nil
+}
 
-	// create alpaca client
+func (h *handler) newClient() alpaca.Client {
+	log.Println("Executing newClient()")
+	baseURL := "https://paper-api.alpaca.markets"
+
 	client := alpaca.NewClient(alpaca.ClientOpts{
-		ApiKey:    apiK,
-		ApiSecret: apiS,
-		BaseURL:   "https://paper-api.alpaca.markets",
+		ApiKey:    h.config.apiKey,
+		ApiSecret: h.config.apiSecret,
+		BaseURL:   baseURL,
 	})
 
+	return client
+}
+
+func (h *handler) trade(req events.APIGatewayProxyRequest) (events.APIGatewayProxyResponse, error) {
+	log.Println("Executing trade()")
 	// retrieve alpaca account information
-	acct, err := client.GetAccount()
+	acct, err := h.client.GetAccount()
 	if err != nil {
 		log.Fatalf("Failed to get the account %v", err)
 	}
 
 	fmt.Printf("%+v\n", *acct)
+	body := fmt.Sprintf("Request successful with api gateway response. Account info: %+v\n", *acct)
+	response := events.APIGatewayProxyResponse{Body: body, StatusCode: 200}
+	return response, nil
+}
+
+func main() {
+	log.Println("Executing main()")
+	cfg, err := newConfig()
+
+	if err != nil {
+		log.Fatalf("Unable to create new config %v\n", err)
+	}
+
+	h := &handler{
+		config: cfg,
+	}
+
+	client := h.newClient()
+	h.client = client
+
+	lambda.Start(h.trade)
+
 }
