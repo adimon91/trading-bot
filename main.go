@@ -62,8 +62,8 @@ func (h *handler) newClient() alpaca.Client {
 	return client
 }
 
-func (h *handler) calculateRSI(ticker string, interval string, length int32) {
-	log.Printf("Calculating RSI with length %d, ticker %s, and interval %s", length, ticker, interval)
+func (h *handler) getHistoricalData(ticker string, interval string, length int32) {
+	log.Printf("Getting historical data with length %d, ticker %s, and interval %s", length, ticker, interval)
 	client := &http.Client{}
 	req, err := http.NewRequest(http.MethodGet, "https://yfapi.net/v8/finance/spark?", nil)
 	if err != nil {
@@ -97,10 +97,22 @@ func (h *handler) calculateRSI(ticker string, interval string, length int32) {
 	}
 
 	log.Println(string(body))
+
+	// TODO: parse and return array with `length` points of historical data
+}
+
+func (h *handler) calculateRSI(ticker string, interval string, length int32) {
+	log.Printf("Calculating RSI with length %d, ticker %s, and interval %s", length, ticker, interval)
+
+	// TODO: accept return of array of data points
+	h.getHistoricalData(ticker, interval, length)
+
+	// TODO: calculate RSI with data points
 }
 
 func (h *handler) trade(req events.APIGatewayProxyRequest) (events.APIGatewayProxyResponse, error) {
 	log.Println("Executing trade()")
+	log.Printf("Request body was: %+v\n", req.Body)
 
 	// retrieve alpaca account information
 	acct, err := h.client.GetAccount()
