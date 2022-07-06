@@ -15,8 +15,9 @@ import (
 )
 
 type configuration struct {
-	apiKey    string
-	apiSecret string
+	alpacaApiKey    string
+	alpacaApiSecret string
+	yahooApiKey     string
 }
 
 type handler struct {
@@ -26,19 +27,25 @@ type handler struct {
 
 func newConfig() (configuration, error) {
 	log.Println("Executing newConfig()")
-	key, ok := os.LookupEnv("ALPACA_API_KEY")
+	alpacaKey, ok := os.LookupEnv("ALPACA_API_KEY")
 	if !ok {
 		return configuration{}, errors.New("can not read env variable")
 	}
 
-	secret, ok := os.LookupEnv(("ALPACA_API_SECRET"))
+	alpacaSecret, ok := os.LookupEnv(("ALPACA_API_SECRET"))
+	if !ok {
+		return configuration{}, errors.New("can not read env variable")
+	}
+
+	yahooKey, ok := os.LookupEnv("YAHOO_API_KEY")
 	if !ok {
 		return configuration{}, errors.New("can not read env variable")
 	}
 
 	return configuration{
-		apiKey:    key,
-		apiSecret: secret,
+		alpacaApiKey:    alpacaKey,
+		alpacaApiSecret: alpacaSecret,
+		yahooApiKey:     yahooKey,
 	}, nil
 }
 
@@ -47,8 +54,8 @@ func (h *handler) newClient() alpaca.Client {
 	baseURL := "https://paper-api.alpaca.markets"
 
 	client := alpaca.NewClient(alpaca.ClientOpts{
-		ApiKey:    h.config.apiKey,
-		ApiSecret: h.config.apiSecret,
+		ApiKey:    h.config.alpacaApiKey,
+		ApiSecret: h.config.alpacaApiSecret,
 		BaseURL:   baseURL,
 	})
 
@@ -72,14 +79,9 @@ func (h *handler) calculateRSI(ticker string, interval string, length int32) {
 	// assign encoded query string to http request
 	req.URL.RawQuery = q.Encode()
 
-	key, ok := os.LookupEnv("YAHOO_API_KEY")
-	if !ok {
-		log.Fatal("can not read env variable")
-	}
-
 	// add headers
 	req.Header.Add("Accept", "application/json")
-	req.Header.Add("X-API-KEY", key)
+	req.Header.Add("X-API-KEY", h.config.yahooApiKey)
 
 	resp, err := client.Do(req)
 	if err != nil {
