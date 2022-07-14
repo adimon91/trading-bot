@@ -6,6 +6,7 @@ require (
 	github.com/alpacahq/alpaca-trade-api-go/v2 v2.7.0
 	github.com/aws/aws-lambda-go v1.32.0
 	github.com/aws/aws-sdk-go v1.44.39
+	github.com/buger/jsonparser v1.1.1
 )
 
 require (

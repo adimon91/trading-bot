@@ -6,12 +6,14 @@ import (
 	"fmt"
 	"io/ioutil"
 	"log"
+	"math"
 	"net/http"
 	"os"
 
 	"github.com/alpacahq/alpaca-trade-api-go/v2/alpaca"
 	"github.com/aws/aws-lambda-go/events"
 	"github.com/aws/aws-lambda-go/lambda"
+	"github.com/buger/jsonparser"
 )
 
 type configuration struct {
@@ -23,6 +25,11 @@ type configuration struct {
 type handler struct {
 	config configuration
 	client alpaca.Client
+}
+
+type Trade struct {
+	Ticker   string `json:"ticker"`
+	Interval string `json:"interval"`
 }
 
 func newConfig() (configuration, error) {
@@ -62,7 +69,7 @@ func (h *handler) newClient() alpaca.Client {
 	return client
 }
 
-func (h *handler) getHistoricalData(ticker string, interval string, length int32) {
+func (h *handler) getHistoricalData(ticker string, interval string, length int) []float64 {
 	log.Printf("Getting historical data with length %d, ticker %s, and interval %s", length, ticker, interval)
 	client := &http.Client{}
 	req, err := http.NewRequest(http.MethodGet, "https://yfapi.net/v8/finance/spark?", nil)
@@ -98,16 +105,58 @@ func (h *handler) getHistoricalData(ticker string, interval string, length int32
 
 	log.Println(string(body))
 
+	// var values []float64
+
 	// TODO: parse and return array with `length` points of historical data
+	data := []byte(body)
+
+	values := make([]float64, 0)
+
+	jsonparser.ArrayEach(data, func(value []byte, dataType jsonparser.ValueType, offset int, err error) {
+		val, err := jsonparser.GetFloat(value)
+		if err != nil {
+			log.Fatalf("Failed to parse JSON %v\n", err)
+		}
+		values = append(values, val)
+
+	}, ticker, "close")
+
+	return values
 }
 
-func (h *handler) calculateRSI(ticker string, interval string, length int32) {
+func (h *handler) calculateRSI(ticker string, interval string, length int) float64 {
 	log.Printf("Calculating RSI with length %d, ticker %s, and interval %s", length, ticker, interval)
 
 	// TODO: accept return of array of data points
-	h.getHistoricalData(ticker, interval, length)
+	values := h.getHistoricalData(ticker, interval, length)
+	log.Println(values)
 
 	// TODO: calculate RSI with data points
+	m := len(values) - length
+
+	posSum := 0.00
+	negSum := 0.00
+
+	for i := m; i < len(values)-1; i++ {
+		change := values[i+1] - values[i]
+		if change >= 0 {
+			posSum += change
+		} else {
+			negSum += math.Abs(change)
+		}
+	}
+
+	posSum /= float64(length)
+	negSum /= float64(length)
+
+	rs := posSum / negSum
+
+	// RSI = 100 - 100/(1 + rs)
+	rsi := 100 - 100/(1+rs)
+
+	fmt.Printf("RSI was %v\n", rsi)
+
+	return rsi
 }
 
 func (h *handler) trade(req events.APIGatewayProxyRequest) (events.APIGatewayProxyResponse, error) {
@@ -126,11 +175,6 @@ func (h *handler) trade(req events.APIGatewayProxyRequest) (events.APIGatewayPro
 		return response, nil
 	}
 
-	type Trade struct {
-		Ticker   string `json:"ticker"`
-		Interval string `json:"interval"`
-	}
-
 	b := []byte(req.Body)
 	var resp Trade
 	err = json.Unmarshal(b, &resp)
@@ -139,9 +183,9 @@ func (h *handler) trade(req events.APIGatewayProxyRequest) (events.APIGatewayPro
 		log.Fatalf("Error unmarshalling json %v\n", err)
 	}
 
-	h.calculateRSI(resp.Ticker, resp.Interval, 14)
+	rsi := h.calculateRSI(resp.Ticker, resp.Interval, 14)
 
-	body := fmt.Sprintf("Request body was: %+v\n", req.Body)
+	body := fmt.Sprintf("Request body was: %+v\n and rsi is %v\n", req.Body, rsi)
 	response := events.APIGatewayProxyResponse{Body: body, StatusCode: 200}
 	return response, nil
 }

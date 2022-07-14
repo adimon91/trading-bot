@@ -56,6 +56,8 @@ github.com/aws/aws-lambda-go v1.32.0 h1:i8MflawW1hoyYp85GMH7LhvAs4cqzL7LOS6fSv8l
 github.com/aws/aws-lambda-go v1.32.0/go.mod h1:IF5Q7wj4VyZyUFnZ54IQqeWtctHQ9tz+KhcbDenr220=
 github.com/aws/aws-sdk-go v1.44.39 h1:pMxYLqnuDidT0ZTDAhYC66fb3W3Yc+oShmfzEL4fTDI=
 github.com/aws/aws-sdk-go v1.44.39/go.mod h1:y4AeaBuwd2Lk+GepC1E9v0qOiTws0MIWAX4oIKwKHZo=
+github.com/buger/jsonparser v1.1.1 h1:2PnMjfWD7wBILjqQbt530v576A/cAbQvEW9gGIpYMUs=
+github.com/buger/jsonparser v1.1.1/go.mod h1:6RYKKt7H4d4+iWqouImQ9R2FZql3VbhNgx27UK13J/0=
 github.com/census-instrumentation/opencensus-proto v0.2.1/go.mod h1:f6KPmirojxKA12rnyqOA5BBL4O983OfeGPqjHWSTneU=
 github.com/cespare/xxhash v1.1.0/go.mod h1:XrSqR1VqqWfGrhpAt58auRo0WTKS1nRRg3ghfAqPWnc=
 github.com/chzyer/logex v1.1.10/go.mod h1:+Ywpsq7O8HXn0nuIou7OrIPyXbp3wmkHB+jjWRnGsAI=
