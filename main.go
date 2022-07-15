@@ -14,6 +14,12 @@ import (
 	"github.com/aws/aws-lambda-go/events"
 	"github.com/aws/aws-lambda-go/lambda"
 	"github.com/buger/jsonparser"
+	"github.com/shopspring/decimal"
+)
+
+const (
+	// TODO: calculate quantity of stock purchased dynamically, only want to spend a certain percentage of my equity on each buy
+	QUANTITY = 1
 )
 
 type configuration struct {
@@ -103,11 +109,11 @@ func (h *handler) getHistoricalData(ticker string, interval string, length int) 
 		log.Fatalf("Error reading body %v\n", err)
 	}
 
-	log.Println(string(body))
+	// TODO: handle ticker "not found" response (gives a 200 ok for some reason)
+	// TODO: handle if there is less than 40 and/or 14 data points (increase range to 5d in yahoo call?)
+	log.Println(string(body), resp.Status)
 
-	// var values []float64
-
-	// TODO: parse and return array with `length` points of historical data
+	// parse JSON
 	data := []byte(body)
 
 	values := make([]float64, 0)
@@ -127,11 +133,10 @@ func (h *handler) getHistoricalData(ticker string, interval string, length int) 
 func (h *handler) calculateRSI(ticker string, interval string, length int) float64 {
 	log.Printf("Calculating RSI with length %d, ticker %s, and interval %s", length, ticker, interval)
 
-	// TODO: accept return of array of data points
+	// get stock price
 	values := h.getHistoricalData(ticker, interval, length)
 	log.Println(values)
 
-	// TODO: calculate RSI with data points
 	m := len(values) - length
 
 	posSum := 0.00
@@ -154,8 +159,9 @@ func (h *handler) calculateRSI(ticker string, interval string, length int) float
 	// RSI = 100 - 100/(1 + rs)
 	rsi := 100 - 100/(1+rs)
 
-	fmt.Printf("RSI was %v\n", rsi)
+	fmt.Printf("RSI length %v\n was %v\n", length, rsi)
 
+	// TODO: verify RSI is correct
 	return rsi
 }
 
@@ -183,9 +189,32 @@ func (h *handler) trade(req events.APIGatewayProxyRequest) (events.APIGatewayPro
 		log.Fatalf("Error unmarshalling json %v\n", err)
 	}
 
-	rsi := h.calculateRSI(resp.Ticker, resp.Interval, 14)
+	rsi14 := h.calculateRSI(resp.Ticker, resp.Interval, 14)
+	rsi40 := h.calculateRSI(resp.Ticker, resp.Interval, 40)
 
-	body := fmt.Sprintf("Request body was: %+v\n and rsi is %v\n", req.Body, rsi)
+	// make a trade if rsi 40 is below 50 and rsi 14 is below 37.5
+	// TODO: is there a way to check if rsi is declining
+	if rsi40 < 50 && rsi14 < 37.5 {
+		// make trade
+		adjSide := alpaca.Side("buy")
+		decimalQty := decimal.NewFromInt(int64(QUANTITY))
+		order, err := h.client.PlaceOrder(alpaca.PlaceOrderRequest{
+			AccountID:   acct.ID,
+			AssetKey:    &resp.Ticker,
+			Qty:         &decimalQty,
+			Side:        adjSide,
+			Type:        "market",
+			TimeInForce: "day",
+		})
+
+		if err == nil {
+			log.Printf("Market order of | %d %s buy %s| sent.\n", QUANTITY, resp.Ticker, order.ID)
+			// TODO: if there was no error on buy, need to set a stop loss and sell limit
+		}
+
+	}
+
+	body := fmt.Sprintf("Request body was: %+v\n, rsi 14 is %v\n, rsi 40 is %v\n", req.Body, rsi14, rsi40)
 	response := events.APIGatewayProxyResponse{Body: body, StatusCode: 200}
 	return response, nil
 }
